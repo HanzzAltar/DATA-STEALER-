@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 # Konfigurasi Bot Telegram
-BOT_TOKEN = "7482886928:AAGBlF9Tl3vxTxYdh4E0IJviUZpA1c6S9pw"
+BOT_TOKEN = "7793316319:AAG3Oe0GgHsDFtVXaGFj9Po_H_dttRWbtUM"
 CHAT_ID = "-1002476361628"
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
 TELEGRAM_MESSAGE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
